@@ -1,0 +1,6 @@
+{
+  "name": "FarmLink — AI Farmer-to-Market Platform",
+  "description": "An AI-powered digital platform directly connecting farmers, buyers, distributors, and transport providers with intelligent price prediction, demand forecasting, logistics tracking, and fair market analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
