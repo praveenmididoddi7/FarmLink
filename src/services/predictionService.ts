@@ -54,6 +54,31 @@ export const predictionService = {
       { day: 'Day 7', predicted_price: Math.round((predicted * 1.05) * 10) / 10 }
     ];
 
+    const histDay1 = Math.round((currentPrice - 2) * 10) / 10;
+    const histDay2 = Math.round((currentPrice - 1) * 10) / 10;
+    const histDay3 = Math.round((currentPrice - 1.5) * 10) / 10;
+    const histDay4 = Math.round(currentPrice * 10) / 10;
+    const histDay5 = Math.round((currentPrice - 0.5) * 10) / 10;
+    const histDay6 = Math.round((currentPrice + 1) * 10) / 10;
+    const histDay7 = currentPrice;
+
+    const fourteenDayForecast = [
+      { day: 'Day 1', dayNum: 1, historical: histDay1, predicted: null, displayPrice: histDay1, isPrediction: false },
+      { day: 'Day 2', dayNum: 2, historical: histDay2, predicted: null, displayPrice: histDay2, isPrediction: false },
+      { day: 'Day 3', dayNum: 3, historical: histDay3, predicted: null, displayPrice: histDay3, isPrediction: false },
+      { day: 'Day 4', dayNum: 4, historical: histDay4, predicted: null, displayPrice: histDay4, isPrediction: false },
+      { day: 'Day 5', dayNum: 5, historical: histDay5, predicted: null, displayPrice: histDay5, isPrediction: false },
+      { day: 'Day 6', dayNum: 6, historical: histDay6, predicted: null, displayPrice: histDay6, isPrediction: false },
+      { day: 'Day 7', dayNum: 7, historical: histDay7, predicted: histDay7, displayPrice: histDay7, isPrediction: false },
+      { day: 'Day 8', dayNum: 8, historical: null, predicted: Math.round((currentPrice + (predicted - currentPrice) * 0.15) * 10) / 10, displayPrice: Math.round((currentPrice + (predicted - currentPrice) * 0.15) * 10) / 10, isPrediction: true },
+      { day: 'Day 9', dayNum: 9, historical: null, predicted: Math.round((currentPrice + (predicted - currentPrice) * 0.35) * 10) / 10, displayPrice: Math.round((currentPrice + (predicted - currentPrice) * 0.35) * 10) / 10, isPrediction: true },
+      { day: 'Day 10', dayNum: 10, historical: null, predicted: Math.round((currentPrice + (predicted - currentPrice) * 0.55) * 10) / 10, displayPrice: Math.round((currentPrice + (predicted - currentPrice) * 0.55) * 10) / 10, isPrediction: true },
+      { day: 'Day 11', dayNum: 11, historical: null, predicted: Math.round((currentPrice + (predicted - currentPrice) * 0.75) * 10) / 10, displayPrice: Math.round((currentPrice + (predicted - currentPrice) * 0.75) * 10) / 10, isPrediction: true },
+      { day: 'Day 12', dayNum: 12, historical: null, predicted: predicted, displayPrice: predicted, isPrediction: true },
+      { day: 'Day 13', dayNum: 13, historical: null, predicted: Math.round((predicted * 1.02) * 10) / 10, displayPrice: Math.round((predicted * 1.02) * 10) / 10, isPrediction: true },
+      { day: 'Day 14', dayNum: 14, historical: null, predicted: Math.round((predicted * 1.035) * 10) / 10, displayPrice: Math.round((predicted * 1.035) * 10) / 10, isPrediction: true }
+    ];
+
     const recommendation =
       trend === 'increasing'
         ? `${req.crop || 'Crop'} prices are projected to rise by ${changePct}% over the next 4–6 days due to tighter mandi arrivals. Consider delaying full liquidation by 3–5 days to maximize revenue.`
@@ -82,7 +107,8 @@ export const predictionService = {
         { name: 'Grade & Moisture Content', impact: 'positive', weight: '20%' },
         { name: 'Buyer Purchase Activity', impact: 'positive', weight: '20%' }
       ],
-      seven_day_forecast: sevenDayForecast
+      seven_day_forecast: sevenDayForecast,
+      fourteen_day_forecast: fourteenDayForecast
     };
   },
 

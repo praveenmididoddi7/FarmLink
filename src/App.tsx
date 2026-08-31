@@ -35,9 +35,14 @@ import { BuyerDashboard } from './pages/buyer/BuyerDashboard';
 import { BuyerOrdersPage } from './pages/buyer/BuyerOrdersPage';
 import { BuyerProfilePage } from './pages/buyer/BuyerProfilePage';
 
-// Transport Pages
-import { TransportDashboard } from './pages/transport/TransportDashboard';
+// Transporter Pages
+import { TransporterDashboard } from './pages/transport/TransporterDashboard';
 import { AvailableLoadsPage } from './pages/transport/AvailableLoadsPage';
+import { LoadDetailsPage } from './pages/transport/LoadDetailsPage';
+import { ActiveDeliveriesPage } from './pages/transport/ActiveDeliveriesPage';
+import { DeliveryDetailsPage } from './pages/transport/DeliveryDetailsPage';
+import { TransporterEarningsPage } from './pages/transport/TransporterEarningsPage';
+import { TransporterProfilePage } from './pages/transport/TransporterProfilePage';
 
 export default function App() {
   return (
@@ -164,22 +169,70 @@ export default function App() {
 
                 {/* Transporter Protected Routes */}
                 <Route
-                  path="/transport/dashboard"
+                  path="/transporter/dashboard"
                   element={
-                    <RoleProtectedRoute allowedRoles={['transport']}>
-                      <TransportDashboard />
+                    <RoleProtectedRoute allowedRoles={['transport', 'transporter']}>
+                      <TransporterDashboard />
                     </RoleProtectedRoute>
                   }
                 />
-                <Route path="/transporter/dashboard" element={<Navigate to="/transport/dashboard" replace />} />
                 <Route
-                  path="/transport/loads"
+                  path="/transporter/loads"
                   element={
-                    <RoleProtectedRoute allowedRoles={['transport']}>
+                    <RoleProtectedRoute allowedRoles={['transport', 'transporter']}>
                       <AvailableLoadsPage />
                     </RoleProtectedRoute>
                   }
                 />
+                <Route
+                  path="/transporter/loads/:id"
+                  element={
+                    <RoleProtectedRoute allowedRoles={['transport', 'transporter']}>
+                      <LoadDetailsPage />
+                    </RoleProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/transporter/deliveries"
+                  element={
+                    <RoleProtectedRoute allowedRoles={['transport', 'transporter']}>
+                      <ActiveDeliveriesPage />
+                    </RoleProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/transporter/deliveries/:id"
+                  element={
+                    <RoleProtectedRoute allowedRoles={['transport', 'transporter']}>
+                      <DeliveryDetailsPage />
+                    </RoleProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/transporter/earnings"
+                  element={
+                    <RoleProtectedRoute allowedRoles={['transport', 'transporter']}>
+                      <TransporterEarningsPage />
+                    </RoleProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/transporter/profile"
+                  element={
+                    <RoleProtectedRoute allowedRoles={['transport', 'transporter']}>
+                      <TransporterProfilePage />
+                    </RoleProtectedRoute>
+                  }
+                />
+
+                {/* Backward compatibility redirects for legacy /transport/* */}
+                <Route path="/transport/dashboard" element={<Navigate to="/transporter/dashboard" replace />} />
+                <Route path="/transport/loads" element={<Navigate to="/transporter/loads" replace />} />
+                <Route path="/transport/loads/:id" element={<Navigate to="/transporter/loads/:id" replace />} />
+                <Route path="/transport/deliveries" element={<Navigate to="/transporter/deliveries" replace />} />
+                <Route path="/transport/deliveries/:id" element={<Navigate to="/transporter/deliveries/:id" replace />} />
+                <Route path="/transport/earnings" element={<Navigate to="/transporter/earnings" replace />} />
+                <Route path="/transport/profile" element={<Navigate to="/transporter/profile" replace />} />
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />

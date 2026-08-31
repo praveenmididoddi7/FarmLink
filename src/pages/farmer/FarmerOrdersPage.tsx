@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { orderApi } from '../../services/api';
+import { orderService } from '../../services/orderService';
 import { useAuth } from '../../context/AuthContext';
 import { Order, OrderStatus } from '../../types';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -13,13 +13,16 @@ export const FarmerOrdersPage: React.FC = () => {
 
   useEffect(() => {
     loadOrders();
+    const handleUpdate = () => loadOrders();
+    window.addEventListener('farmlink_orders_updated', handleUpdate);
+    return () => window.removeEventListener('farmlink_orders_updated', handleUpdate);
   }, [user]);
 
   const loadOrders = async () => {
     setLoading(true);
     try {
-      const farmerId = user?.id || 'usr_farmer_1';
-      const data = await orderApi.getAll({ farmer_id: farmerId });
+      const farmerId = user?.id || 'user_farmer_1';
+      const data = await orderService.getAll({ farmer_id: farmerId });
       setOrders(data);
     } catch (err) {
       console.error(err);
@@ -30,7 +33,7 @@ export const FarmerOrdersPage: React.FC = () => {
 
   const handleUpdateStatus = async (orderId: string, status: OrderStatus) => {
     try {
-      await orderApi.updateStatus(orderId, status);
+      await orderService.updateStatus(orderId, status);
       await loadOrders();
     } catch (err) {
       console.error(err);

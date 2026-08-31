@@ -28,11 +28,11 @@ api.interceptors.request.use((config) => {
 });
 
 export const authApi = {
-  login: async (email: string, role?: string) => {
-    const res = await api.post<{ token: string; user: User }>('/auth/login', { email, role });
+  login: async (email: string, password?: string) => {
+    const res = await api.post<{ token: string; user: User }>('/auth/login', { email, password });
     return res.data;
   },
-  register: async (userData: Partial<User>) => {
+  register: async (userData: Partial<User> & { password?: string }) => {
     const res = await api.post<{ token: string; user: User }>('/auth/register', userData);
     return res.data;
   },

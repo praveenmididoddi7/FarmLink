@@ -13,6 +13,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { cropService } from '../../services/cropService';
 import { cropApi } from '../../services/api';
 import { Crop } from '../../types';
 
@@ -26,13 +27,16 @@ export const MyListingsPage: React.FC = () => {
 
   useEffect(() => {
     loadCrops();
+    const handleUpdate = () => loadCrops();
+    window.addEventListener('farmlink_crops_updated', handleUpdate);
+    return () => window.removeEventListener('farmlink_crops_updated', handleUpdate);
   }, [user]);
 
   const loadCrops = async () => {
     setLoading(true);
     try {
-      const farmerId = user?.id || 'usr_farmer_1';
-      const data = await cropApi.getAll({ farmer_id: farmerId });
+      const farmerId = user?.id || 'user_farmer_1';
+      const data = await cropService.getAll({ farmer_id: farmerId });
       setCrops(data);
     } catch (err) {
       console.error(err);
@@ -44,7 +48,7 @@ export const MyListingsPage: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to remove this crop listing?')) return;
     try {
-      await cropApi.delete(id);
+      await cropService.delete(id);
       setCrops(prev => prev.filter(c => c.id !== id));
     } catch (err) {
       console.error(err);
@@ -54,7 +58,7 @@ export const MyListingsPage: React.FC = () => {
   const handleSaveEdit = async () => {
     if (!editingCrop) return;
     try {
-      const updated = await cropApi.update(editingCrop.id, {
+      const updated = await cropService.update(editingCrop.id, {
         price: editPrice,
         quantity: editQuantity
       });

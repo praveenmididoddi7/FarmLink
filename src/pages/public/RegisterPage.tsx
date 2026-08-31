@@ -44,7 +44,7 @@ export const RegisterPage: React.FC = () => {
 
       if (user.role === 'farmer') navigate('/farmer/dashboard', { replace: true });
       else if (user.role === 'buyer') navigate('/marketplace', { replace: true });
-      else if (user.role === 'transport') navigate('/transport/dashboard', { replace: true });
+      else if (user.role === 'transport' || (user.role as any) === 'transporter') navigate('/transporter/dashboard', { replace: true });
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.');
     } finally {

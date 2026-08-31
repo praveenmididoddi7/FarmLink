@@ -7,19 +7,11 @@ import {
   Package,
   Sparkles,
   ArrowRight,
-  Clock,
-  CheckCircle2,
-  DollarSign,
-  AlertCircle,
-  MapPin,
-  Truck,
-  Layers,
-  ChevronRight,
-  Activity,
   ShieldCheck,
   Check,
   X as XIcon,
-  Eye
+  Eye,
+  ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { cropService } from '../../services/cropService';
@@ -28,6 +20,7 @@ import { marketService } from '../../services/marketService';
 import { predictionService } from '../../services/predictionService';
 import { Crop, Order, MarketPriceRecord, AIRecommendation, OrderStatus } from '../../types';
 import { StatusBadge } from '../../components/common/StatusBadge';
+import { PricePredictionChart } from '../../components/farmer/PricePredictionChart';
 
 export const FarmerDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -40,12 +33,19 @@ export const FarmerDashboard: React.FC = () => {
 
   useEffect(() => {
     loadDashboardData();
+    const handleUpdate = () => loadDashboardData();
+    window.addEventListener('farmlink_orders_updated', handleUpdate);
+    window.addEventListener('farmlink_crops_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('farmlink_orders_updated', handleUpdate);
+      window.removeEventListener('farmlink_crops_updated', handleUpdate);
+    };
   }, [user]);
 
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const farmerId = user?.id || 'usr_farmer_1';
+      const farmerId = user?.id || 'user_farmer_1';
       const [cropsData, ordersData, pricesData, recsData] = await Promise.all([
         cropService.getAll({ farmer_id: farmerId }),
         orderService.getAll({ farmer_id: farmerId }),
@@ -76,7 +76,6 @@ export const FarmerDashboard: React.FC = () => {
     }
   };
 
-  // Calculations for Farmer KPIs
   const totalCropsListed = crops.length;
   const activeOrdersCount = orders.filter(
     o => o.status === 'PENDING' || o.status === 'CONFIRMED' || o.status === 'PICKED_UP' || o.status === 'IN_TRANSIT'
@@ -92,153 +91,157 @@ export const FarmerDashboard: React.FC = () => {
       : 28;
 
   return (
-    <div className="min-h-screen py-8">
+    <div className="min-h-screen bg-slate-50/50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        {/* Top Welcome & Quick Actions Header */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass p-6 sm:p-8 rounded-3xl border border-white/80 shadow-md">
+        {/* 1. Header (Title, Short description, 1-2 primary actions) */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/80 shadow-xs">
           <div>
-            <div className="inline-flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full mb-2.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>Farmer Portal • {user?.location || 'Nashik Mandi Zone, Maharashtra'}</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold text-emerald-800 bg-emerald-50 mb-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>Farmer Portal • {user?.location || 'Nashik Mandi Zone'}</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-emerald-950 font-['Outfit',sans-serif]">
-              Farmer Command Center
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-['Outfit',sans-serif]">
+              Farmer Dashboard
             </h1>
-            <p className="text-xs sm:text-sm text-emerald-700/80 mt-0.5 font-medium">
-              Welcome back, {user?.name || 'Ramesh Patel'}. Real-time APMC price curves and wholesale dispatches are active.
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              Welcome back, {user?.name || 'Ramesh Patel'}. Track active crop lots, incoming wholesale purchase orders, and Mandi price curves.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <Link
               to="/farmer/add-crop"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-2xl font-bold text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-semibold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <PlusCircle className="w-4 h-4" />
-              <span>List New Crop</span>
+              <span>List Crop</span>
             </Link>
 
             <Link
               to="/farmer/predictions"
-              className="glass hover:bg-white/80 border border-emerald-300/60 text-emerald-900 px-4 py-2.5 rounded-2xl font-bold text-xs transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+              className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
             >
               <Sparkles className="w-4 h-4 text-emerald-600" />
-              <span>AI Price Predictor</span>
+              <span>Predict Price</span>
             </Link>
           </div>
-        </header>
+        </div>
 
-        {/* 4 Frosted KPI Metric Cards */}
+        {/* 2. Important Statistics (4 Clean Metric Cards) */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="glass p-5 rounded-3xl border border-white/80 shadow-xs space-y-1.5 hover:bg-white/70 transition-all">
-            <p className="text-emerald-700 text-[11px] font-extrabold uppercase tracking-wider">Total Crops Listed</p>
-            <h3 className="text-2xl sm:text-3xl font-black text-emerald-950 font-['Outfit',sans-serif]">
-              {totalCropsListed} <span className="text-sm font-bold text-emerald-700">Lots</span>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-1">
+            <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Total Crops Listed</p>
+            <h3 className="text-2xl sm:text-3xl font-black text-slate-900 font-['Outfit',sans-serif]">
+              {totalCropsListed} <span className="text-xs font-semibold text-slate-500">Lots</span>
             </h3>
-            <div className="flex items-center text-xs font-bold text-emerald-600">
-              <span>{crops.reduce((s, c) => s + c.quantity, 0).toLocaleString()} kg in farm inventory</span>
-            </div>
-          </div>
-
-          <div className="glass p-5 rounded-3xl border border-white/80 shadow-xs space-y-1.5 hover:bg-white/70 transition-all">
-            <p className="text-emerald-700 text-[11px] font-extrabold uppercase tracking-wider">Active Wholesale Orders</p>
-            <h3 className="text-2xl sm:text-3xl font-black text-emerald-950 font-['Outfit',sans-serif]">
-              {activeOrdersCount}
-            </h3>
-            <p className="text-emerald-700/80 text-xs font-medium">
-              {orders.filter(o => o.status === 'PENDING').length} awaiting confirmation
+            <p className="text-xs text-slate-500">
+              {crops.reduce((s, c) => s + c.quantity, 0).toLocaleString()} kg in farm inventory
             </p>
           </div>
 
-          <div className="glass p-5 rounded-3xl border border-white/80 shadow-xs space-y-1.5 hover:bg-white/70 transition-all">
-            <p className="text-emerald-700 text-[11px] font-extrabold uppercase tracking-wider">Total Sales Revenue</p>
-            <h3 className="text-2xl sm:text-3xl font-black text-emerald-950 font-['Outfit',sans-serif]">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-1">
+            <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Active Wholesale Orders</p>
+            <h3 className="text-2xl sm:text-3xl font-black text-slate-900 font-['Outfit',sans-serif]">
+              {activeOrdersCount}
+            </h3>
+            <p className="text-xs text-slate-500">
+              {orders.filter(o => o.status === 'PENDING').length} awaiting your confirmation
+            </p>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-1">
+            <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Total Sales Revenue</p>
+            <h3 className="text-2xl sm:text-3xl font-black text-slate-900 font-['Outfit',sans-serif]">
               ₹{(totalSalesRevenue || 142800).toLocaleString()}
             </h3>
-            <div className="flex items-center text-xs font-bold text-emerald-600">
-              <TrendingUp className="w-3.5 h-3.5 mr-1" />
+            <div className="flex items-center text-xs font-semibold text-emerald-600">
+              <ShieldCheck className="w-3.5 h-3.5 mr-1" />
               <span>Escrow Secured</span>
             </div>
           </div>
 
-          <div className="glass p-5 rounded-3xl border border-white/80 shadow-xs space-y-1.5 hover:bg-white/70 transition-all">
-            <p className="text-emerald-700 text-[11px] font-extrabold uppercase tracking-wider">Average Crop Price</p>
-            <h3 className="text-2xl sm:text-3xl font-black text-emerald-950 font-['Outfit',sans-serif]">
-              ₹{avgCropPrice} <span className="text-sm font-bold text-emerald-700">/ kg</span>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-1">
+            <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">Average Crop Price</p>
+            <h3 className="text-2xl sm:text-3xl font-black text-slate-900 font-['Outfit',sans-serif]">
+              ₹{avgCropPrice} <span className="text-xs font-semibold text-slate-500">/ kg</span>
             </h3>
-            <div className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Direct-to-buyer rate</span>
-            </div>
+            <p className="text-xs text-emerald-600 font-semibold">Direct-to-buyer realized rate</p>
           </div>
         </section>
 
-        {/* AI Recommendation Alert Card */}
-        {recommendations.length > 0 && (
-          <div className="glass p-6 rounded-3xl border border-emerald-300/80 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-emerald-50/60 to-emerald-100/40">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-600/20">
-                <Sparkles className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white px-2 py-0.5 rounded-md">
-                    AI Market Advisory
-                  </span>
-                  <span className="text-xs text-emerald-800 font-bold">{recommendations[0]?.title || 'Price Surge Warning'}</span>
+        {/* 3. AI Price Prediction Graph & Market Advisory */}
+        <section className="space-y-4">
+          <PricePredictionChart
+            cropName="Tomato (Hybrid Red)"
+            locationName={user?.location || 'Nashik APMC Mandi'}
+          />
+
+          {recommendations.length > 0 && (
+            <div className="bg-emerald-50/70 border border-emerald-200/80 p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                  <Sparkles className="w-4 h-4" />
                 </div>
-                <p className="text-xs sm:text-sm text-emerald-950 mt-1 font-medium leading-relaxed">
-                  {recommendations[0]?.description ||
-                    'Tomato prices in Nashik APMC are expected to increase by 14% over the next 4 days. Consider staggering harvest lots.'}
-                </p>
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white px-2 py-0.5 rounded">
+                      AI Advisory
+                    </span>
+                    <span className="text-xs font-bold text-slate-900">{recommendations[0]?.title || 'Price Surge Warning'}</span>
+                  </div>
+                  <p className="text-xs text-slate-700 leading-relaxed">
+                    {recommendations[0]?.description ||
+                      'Tomato prices in Nashik APMC are projected to increase by 14% over the next 4 days. Consider staggering your harvest lots.'}
+                  </p>
+                </div>
               </div>
+
+              <Link
+                to="/farmer/predictions"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-semibold text-xs shrink-0 flex items-center gap-1.5 transition-all self-start md:self-auto cursor-pointer"
+              >
+                <span>Run Custom Prediction</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
+          )}
+        </section>
 
-            <Link
-              to="/farmer/predictions"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-2xl font-bold text-xs shrink-0 flex items-center gap-1.5 shadow-xs transition-all self-start md:self-auto"
-            >
-              <span>Predict My Crop Price</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        )}
-
-        {/* Main Grid: Orders on Left, Live Mandi Prices on Right */}
+        {/* 4. Recent Activity: Wholesale Orders & Mandi Benchmark */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Recent Orders Section */}
           <div className="lg:col-span-8 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-black text-emerald-950 font-['Outfit',sans-serif]">
+                <h2 className="text-lg font-bold text-slate-900">
                   Recent Wholesale Purchase Orders
                 </h2>
-                <p className="text-xs text-emerald-700/80 font-medium">Incoming orders from verified supermarket and institutional buyers</p>
+                <p className="text-xs text-slate-500">Incoming purchase requests from verified supermarket and institutional buyers</p>
               </div>
-              <Link to="/farmer/orders" className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1">
+              <Link to="/farmer/orders" className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
                 <span>View All ({orders.length})</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
 
             {loading ? (
-              <div className="glass rounded-3xl p-8 text-center text-xs text-emerald-800">
-                Loading wholesale orders...
+              <div className="bg-white rounded-2xl p-8 text-center text-xs text-slate-500 border border-slate-200">
+                Loading orders...
               </div>
             ) : orders.length === 0 ? (
-              <div className="glass rounded-3xl p-10 text-center border border-white/80 text-emerald-800 text-xs font-medium space-y-3">
-                <Package className="w-8 h-8 text-emerald-600/50 mx-auto" />
-                <p>No orders received yet. List high-demand crops to start receiving direct buyer bids.</p>
-                <Link to="/farmer/add-crop" className="inline-block bg-emerald-600 text-white font-bold px-4 py-2 rounded-xl text-xs">
+              <div className="bg-white rounded-2xl p-8 text-center border border-slate-200 text-slate-500 text-xs space-y-3">
+                <Package className="w-8 h-8 text-slate-400 mx-auto" />
+                <p>No orders received yet. List crops to begin receiving direct buyer bids.</p>
+                <Link to="/farmer/add-crop" className="inline-block bg-emerald-600 text-white font-semibold px-4 py-2 rounded-xl text-xs">
                   List Crop Now
                 </Link>
               </div>
             ) : (
-              <div className="glass rounded-3xl border border-white/80 overflow-hidden shadow-xs">
+              <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-emerald-100/80 bg-emerald-50/50 text-emerald-900 font-extrabold uppercase text-[10px] tracking-wider">
+                      <tr className="border-b border-slate-100 bg-slate-50/70 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
                         <th className="py-3 px-4">Order ID</th>
                         <th className="py-3 px-4">Buyer</th>
                         <th className="py-3 px-4">Crops & Qty</th>
@@ -247,26 +250,26 @@ export const FarmerDashboard: React.FC = () => {
                         <th className="py-3 px-4 text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-emerald-100/60 font-medium text-emerald-950">
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-900">
                       {orders.slice(0, 5).map(order => (
-                        <tr key={order.id} className="hover:bg-white/60 transition-colors">
-                          <td className="py-3.5 px-4 font-mono font-bold text-emerald-900">
+                        <tr key={order.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-700">
                             #{order.id.slice(-5)}
                           </td>
                           <td className="py-3.5 px-4">
-                            <div className="font-bold text-emerald-950">{order.buyer_name}</div>
-                            <div className="text-[10px] text-emerald-700/70">{order.buyer_phone}</div>
+                            <div className="font-bold text-slate-900">{order.buyer_name}</div>
+                            <div className="text-[10px] text-slate-500">{order.buyer_phone}</div>
                           </td>
                           <td className="py-3.5 px-4">
-                            <div className="font-bold text-emerald-950">
+                            <div className="font-medium text-slate-900">
                               {order.items.map(i => `${i.crop_name} (${i.quantity} ${i.unit})`).join(', ')}
                             </div>
                           </td>
-                          <td className="py-3.5 px-4 font-black font-['Outfit',sans-serif] text-emerald-950 text-sm">
+                          <td className="py-3.5 px-4 font-bold text-slate-900">
                             ₹{(order.total_amount || order.total_price || 0).toLocaleString()}
                           </td>
                           <td className="py-3.5 px-4">
-                            <StatusBadge status={order.status} />
+                            <StatusBadge status={order.status} size="sm" />
                           </td>
                           <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
                             {order.status === 'PENDING' && (
@@ -274,7 +277,7 @@ export const FarmerDashboard: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleUpdateOrderStatus(order.id, 'CONFIRMED')}
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-xl text-[11px] font-bold shadow-xs inline-flex items-center gap-1 cursor-pointer"
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
                                   title="Accept Order"
                                 >
                                   <Check className="w-3 h-3" /> Accept
@@ -282,7 +285,7 @@ export const FarmerDashboard: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleUpdateOrderStatus(order.id, 'CANCELLED')}
-                                  className="glass text-rose-600 hover:bg-rose-50 px-2 py-1 rounded-xl text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                                  className="text-rose-600 hover:bg-rose-50 px-2 py-1 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer border border-rose-200"
                                   title="Reject Order"
                                 >
                                   <XIcon className="w-3 h-3" />
@@ -292,7 +295,7 @@ export const FarmerDashboard: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => setSelectedOrder(order)}
-                              className="glass border border-white/80 text-emerald-900 hover:bg-white px-2.5 py-1 rounded-xl text-[11px] font-bold cursor-pointer"
+                              className="border border-slate-200 text-slate-700 hover:bg-slate-50 px-2.5 py-1 rounded-lg text-[11px] font-semibold cursor-pointer"
                             >
                               <Eye className="w-3 h-3 inline mr-1" /> View
                             </button>
@@ -306,37 +309,37 @@ export const FarmerDashboard: React.FC = () => {
             )}
           </div>
 
-          {/* Live Market Mandi Prices Sidebar */}
+          {/* Mandi Price Benchmark Section */}
           <div className="lg:col-span-4 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-black text-emerald-950 font-['Outfit',sans-serif]">
-                  Live Mandi Benchmark
+                <h2 className="text-lg font-bold text-slate-900">
+                  Mandi Benchmark
                 </h2>
-                <p className="text-xs text-emerald-700/80 font-medium">Regional APMC rates today</p>
+                <p className="text-xs text-slate-500">Today's APMC modal rates</p>
               </div>
-              <Link to="/market-prices" className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1">
+              <Link to="/market-prices" className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
                 <span>All Mandis</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
 
-            <div className="glass rounded-3xl border border-white/80 p-4 shadow-xs space-y-3">
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-2.5">
               {marketPrices.map((item, idx) => {
                 const isPositive = (item.change_percent || 0) >= 0;
                 return (
                   <div
                     key={item.id || idx}
-                    className="glass p-3 rounded-2xl border border-white/80 flex items-center justify-between hover:bg-white/70 transition-all"
+                    className="p-3 rounded-xl border border-slate-100 flex items-center justify-between hover:bg-slate-50 transition-all"
                   >
                     <div>
-                      <div className="font-extrabold text-xs text-emerald-950">{item.crop}</div>
-                      <div className="text-[10px] text-emerald-700/70 font-medium">
+                      <div className="font-bold text-xs text-slate-900">{item.crop}</div>
+                      <div className="text-[10px] text-slate-500">
                         {item.mandi} • {item.state}
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-black text-xs text-emerald-950 font-['Outfit',sans-serif]">
+                      <div className="font-bold text-xs text-slate-900">
                         ₹{item.modal_price} / kg
                       </div>
                       <div
@@ -361,42 +364,42 @@ export const FarmerDashboard: React.FC = () => {
 
       {/* Order Detail Modal */}
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/40 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="glass max-w-lg w-full rounded-3xl border border-white/90 p-6 sm:p-7 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-emerald-100/80">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white max-w-lg w-full rounded-2xl border border-slate-200 p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <h3 className="font-black text-base text-emerald-950">Wholesale Order Details</h3>
-                <p className="text-xs text-emerald-700/80">Order ID: {selectedOrder.id}</p>
+                <h3 className="font-bold text-base text-slate-900">Wholesale Purchase Order</h3>
+                <p className="text-xs text-slate-500">Order ID: #{selectedOrder.id}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedOrder(null)}
-                className="glass p-2 rounded-xl text-emerald-950 hover:bg-white"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
               >
                 <XIcon className="w-4 h-4" />
               </button>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="glass p-3.5 rounded-2xl border border-white/80 space-y-1">
-                <div className="text-emerald-700 font-bold">Buyer Information</div>
-                <div className="font-extrabold text-emerald-950 text-sm">{selectedOrder.buyer_name}</div>
-                <div className="text-emerald-800">Phone: {selectedOrder.buyer_phone}</div>
-                <div className="text-emerald-800">Delivery Address: {selectedOrder.delivery_address}</div>
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-1">
+                <div className="text-slate-500 font-bold">Buyer Details</div>
+                <div className="font-bold text-slate-900 text-sm">{selectedOrder.buyer_name}</div>
+                <div className="text-slate-600">Phone: {selectedOrder.buyer_phone}</div>
+                <div className="text-slate-600">Delivery Address: {selectedOrder.delivery_address}</div>
               </div>
 
               <div>
-                <div className="font-bold text-emerald-950 mb-1.5">Purchased Lots</div>
+                <div className="font-bold text-slate-900 mb-1.5">Purchased Lots</div>
                 <div className="space-y-1.5">
                   {selectedOrder.items.map((item, idx) => (
-                    <div key={idx} className="glass p-2.5 rounded-xl flex items-center justify-between">
+                    <div key={idx} className="p-2.5 rounded-lg bg-slate-50 flex items-center justify-between">
                       <div>
-                        <span className="font-bold text-emerald-950">{item.crop_name}</span>
-                        <span className="text-emerald-700/80 block text-[11px]">
+                        <span className="font-bold text-slate-900">{item.crop_name}</span>
+                        <span className="text-slate-500 block text-[11px]">
                           ₹{item.price_per_unit || item.unit_price}/{item.unit}
                         </span>
                       </div>
-                      <div className="font-black text-emerald-950">
+                      <div className="font-bold text-slate-900">
                         {item.quantity} {item.unit}
                       </div>
                     </div>
@@ -404,9 +407,9 @@ export const FarmerDashboard: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex justify-between items-center pt-2 border-t border-emerald-100/80 font-bold">
-                <span>Total Amount:</span>
-                <span className="text-base font-black text-emerald-950">
+              <div className="flex justify-between items-center pt-2 border-t border-slate-100 font-bold">
+                <span className="text-slate-700">Total Order Value:</span>
+                <span className="text-base font-black text-slate-900">
                   ₹{(selectedOrder.total_amount || selectedOrder.total_price || 0).toLocaleString()}
                 </span>
               </div>
@@ -418,14 +421,14 @@ export const FarmerDashboard: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleUpdateOrderStatus(selectedOrder.id, 'CONFIRMED')}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-xs"
                   >
                     Accept Order
                   </button>
                   <button
                     type="button"
                     onClick={() => handleUpdateOrderStatus(selectedOrder.id, 'CANCELLED')}
-                    className="glass text-rose-600 hover:bg-rose-50 px-3 py-2 rounded-xl text-xs font-bold"
+                    className="text-rose-600 hover:bg-rose-50 px-3 py-2 rounded-xl text-xs font-semibold border border-rose-200"
                   >
                     Reject
                   </button>
@@ -434,7 +437,7 @@ export const FarmerDashboard: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedOrder(null)}
-                className="glass border border-white/80 px-4 py-2 rounded-xl text-xs font-bold text-emerald-950"
+                className="border border-slate-200 px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Close
               </button>

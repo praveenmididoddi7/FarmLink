@@ -5,7 +5,7 @@ import { UserRole } from '../../types';
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles: UserRole[];
+  allowedRoles: (UserRole | string)[];
 }
 
 export const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({ children, allowedRoles }) => {
@@ -27,14 +27,22 @@ export const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({ children
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!allowedRoles.includes(user.role)) {
+  // Normalize transport role check
+  const isAuthorized = allowedRoles.some(r => {
+    if (r === 'transport' || r === 'transporter') {
+      return user.role === 'transport' || (user.role as any) === 'transporter';
+    }
+    return user.role === r;
+  });
+
+  if (!isAuthorized) {
     // Redirect to user's authorized home screen
     if (user.role === 'farmer') {
       return <Navigate to="/farmer/dashboard" replace />;
     } else if (user.role === 'buyer') {
       return <Navigate to="/marketplace" replace />;
-    } else if (user.role === 'transport') {
-      return <Navigate to="/transport/dashboard" replace />;
+    } else if (user.role === 'transport' || (user.role as any) === 'transporter') {
+      return <Navigate to="/transporter/dashboard" replace />;
     }
     return <Navigate to="/" replace />;
   }

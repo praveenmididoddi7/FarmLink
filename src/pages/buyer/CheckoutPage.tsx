@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
+import { orderService } from '../../services/orderService';
 import { orderApi } from '../../services/api';
 import {
   ShieldCheck,
@@ -51,16 +52,24 @@ export const CheckoutPage: React.FC = () => {
       const orderItems = items.map(it => ({
         crop_id: it.crop.id,
         crop_name: it.crop.name,
+        variety: it.crop.variety || '',
+        farmer_id: it.crop.farmer_id || 'user_farmer_1',
+        farmer_name: it.crop.farmer_name || 'Ramesh Patel',
+        farmer_phone: it.crop.farmer_phone || '+91 98452 11029',
+        unit_price: it.crop.price,
+        price_per_unit: it.crop.price,
         quantity: it.quantity,
         unit: it.crop.unit,
-        price_per_unit: it.crop.price,
+        image: it.crop.image,
+        pickup_location: it.crop.location || 'Farm Gate',
+        subtotal: it.crop.price * it.quantity,
         total: it.crop.price * it.quantity
       }));
 
-      const res = await orderApi.create({
-        buyer_id: user?.id || 'usr_buyer_1',
+      const res = await orderService.create({
+        buyer_id: user?.id || 'user_buyer_1',
         buyer_name: user?.name || 'FreshDirect Wholesale (Priya Sharma)',
-        buyer_phone: phone,
+        buyer_phone: phone || user?.phone || '+91 98200 45678',
         delivery_address: deliveryAddress,
         items: orderItems,
         payment_method: paymentMethod,

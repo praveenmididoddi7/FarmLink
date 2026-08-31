@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { orderApi, transportApi } from '../../services/api';
+import { orderService } from '../../services/orderService';
+import { transportService } from '../../services/transportService';
 import { useAuth } from '../../context/AuthContext';
 import { Order, TransportRequest } from '../../types';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -25,15 +26,22 @@ export const BuyerOrdersPage: React.FC = () => {
 
   useEffect(() => {
     loadOrders();
+    const handleUpdate = () => loadOrders();
+    window.addEventListener('farmlink_orders_updated', handleUpdate);
+    window.addEventListener('farmlink_transports_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('farmlink_orders_updated', handleUpdate);
+      window.removeEventListener('farmlink_transports_updated', handleUpdate);
+    };
   }, [user]);
 
   const loadOrders = async () => {
     setLoading(true);
     try {
-      const buyerId = user?.id || 'usr_buyer_1';
+      const buyerId = user?.id || 'user_buyer_1';
       const [ordersData, transportsData] = await Promise.all([
-        orderApi.getAll({ buyer_id: buyerId }),
-        transportApi.getAll()
+        orderService.getAll({ buyer_id: buyerId }),
+        transportService.getAll()
       ]);
       setOrders(ordersData);
       setTransports(transportsData);
@@ -47,7 +55,7 @@ export const BuyerOrdersPage: React.FC = () => {
   const handleConfirmDelivery = async (orderId: string) => {
     if (!window.confirm('Confirm that all produce lots have arrived and passed quality gate inspection? This will release escrow payout to the farmer.')) return;
     try {
-      await orderApi.updateStatus(orderId, 'DELIVERED');
+      await orderService.updateStatus(orderId, 'DELIVERED');
       await loadOrders();
     } catch (e) {
       console.error(e);

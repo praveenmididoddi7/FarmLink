@@ -9,7 +9,7 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   loading: boolean;
-  login: (email: string, password?: string, role?: UserRole) => Promise<User>;
+  login: (email?: string, password?: string) => Promise<User>;
   loginAsDemo: (role: UserRole) => Promise<User>;
   register: (userData: {
     name: string;
@@ -47,10 +47,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const login = async (email: string, password?: string, targetRole?: UserRole): Promise<User> => {
+  const login = async (email?: string, password?: string): Promise<User> => {
     setLoading(true);
     try {
-      const res = await authService.login(email, password, targetRole);
+      const res = await authService.login(email, password);
       setUser(res.user);
       setToken(res.token);
       return res.user;

@@ -18,6 +18,7 @@ import {
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { predictionService } from '../../services/predictionService';
 import { PricePredictionResponse, PricePredictionRequest } from '../../types';
+import { PricePredictionChart } from '../../components/farmer/PricePredictionChart';
 
 export const AIPredictionPage: React.FC = () => {
   const navigate = useNavigate();
@@ -322,38 +323,12 @@ export const AIPredictionPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* 7-Day Projected Trajectory Area Chart */}
-                  <div className="space-y-2 pt-2">
-                    <div className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
-                      <BarChart3 className="w-4 h-4 text-emerald-600" /> 7-Day Predicted Price Curve (₹/{unit})
-                    </div>
-                    <div className="h-56 w-full glass rounded-2xl p-3 border border-white/80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={result.seven_day_forecast}>
-                          <defs>
-                            <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#059669" stopOpacity={0.4} />
-                              <stop offset="95%" stopColor="#059669" stopOpacity={0.0} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} />
-                          <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#064e3b' }} />
-                          <YAxis tick={{ fontSize: 10, fill: '#064e3b' }} domain={['auto', 'auto']} />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: '#ffffff',
-                              borderRadius: '16px',
-                              border: '1px solid #d1fae5',
-                              fontSize: '11px',
-                              fontWeight: 'bold',
-                              color: '#064e3b'
-                            }}
-                          />
-                          <Area type="monotone" dataKey="predicted_price" stroke="#059669" strokeWidth={3} fillOpacity={1} fill="url(#priceGrad)" />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
+                  {/* 14-Day Historical & AI Predicted Curve */}
+                  <PricePredictionChart
+                    customData={result.fourteen_day_forecast}
+                    cropName={`${result.crop} (${variety})`}
+                    locationName={result.location || location}
+                  />
 
                   {/* Action Button to List Produce with this price */}
                   <button

@@ -49,6 +49,14 @@ export interface PricePredictionResponse {
     day: string;
     predicted_price: number;
   }[];
+  fourteen_day_forecast?: {
+    day: string;
+    dayNum: number;
+    historical: number | null;
+    predicted: number | null;
+    displayPrice: number;
+    isPrediction: boolean;
+  }[];
 }
 
 export interface DemandForecastData {

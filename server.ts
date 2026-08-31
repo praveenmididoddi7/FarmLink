@@ -44,6 +44,15 @@ function getGemini(): GoogleGenAI | null {
   return geminiClient;
 }
 
+// User credentials store (seeded + runtime registered)
+const userCredentials: Record<string, string> = {
+  'farmer@farmlink.io': 'password123',
+  'gowri.agro@farmlink.io': 'password123',
+  'buyer@farmlink.io': 'password123',
+  'rajesh.foods@farmlink.io': 'password123',
+  'transport@farmlink.io': 'password123'
+};
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -51,20 +60,31 @@ async function startServer() {
   app.use(express.json());
 
   // ----------------------------------------------------
-  // AUTH API (JWT/Token Simulation for Prototype)
+  // AUTH API (Strict credential authentication)
   // ----------------------------------------------------
   app.post('/api/auth/login', (req, res) => {
-    const { email, role } = req.body;
-    let user = users.find(u => u.email.toLowerCase() === (email || '').toLowerCase());
-    
-    // If not found by email, find default by role or fallback
-    if (!user && role) {
-      user = users.find(u => u.role === role);
+    const { email, password } = req.body;
+
+    if (!email || !String(email).trim()) {
+      return res.status(400).json({ error: 'Email is required.' });
     }
-    if (!user) {
-      user = users[0]; // fallback
+    if (!password || !String(password).trim()) {
+      return res.status(400).json({ error: 'Password is required.' });
     }
 
+    const cleanEmail = String(email).trim().toLowerCase();
+    const user = users.find(u => u.email.toLowerCase() === cleanEmail);
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    const expectedPassword = userCredentials[cleanEmail] || 'password123';
+    if (password !== expectedPassword) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    // Return authenticated user ONLY upon valid match
     res.json({
       token: `farm_jwt_token_${user.id}_${Date.now()}`,
       refresh: `farm_jwt_refresh_${user.id}`,
@@ -73,17 +93,25 @@ async function startServer() {
   });
 
   app.post('/api/auth/register', (req, res) => {
-    const { name, email, role, phone, location, farm_name, farm_size, business_name, vehicle_type, vehicle_number } = req.body;
+    const { name, email, role, phone, location, password, farm_name, farm_size, business_name, vehicle_type, vehicle_number } = req.body;
     
-    const existing = users.find(u => u.email.toLowerCase() === (email || '').toLowerCase());
+    if (!email || !String(email).trim()) {
+      return res.status(400).json({ error: 'Email is required.' });
+    }
+    if (!password || !String(password).trim()) {
+      return res.status(400).json({ error: 'Password is required.' });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const existing = users.find(u => u.email.toLowerCase() === cleanEmail);
     if (existing) {
-      return res.status(400).json({ error: 'User with this email already exists' });
+      return res.status(400).json({ error: 'An account with this email already exists.' });
     }
 
     const newUser: User = {
       id: `user_${Date.now()}`,
       name: name || 'New User',
-      email: email || `user_${Date.now()}@farmlink.io`,
+      email: cleanEmail,
       role: (role as any) || 'farmer',
       phone: phone || '+91 90000 00000',
       location: location || 'India',
@@ -92,10 +120,16 @@ async function startServer() {
       business_name,
       vehicle_type,
       vehicle_number,
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
+      avatar:
+        role === 'farmer'
+          ? 'https://images.unsplash.com/photo-1595273670150-bd0c3c392e46?w=150&auto=format&fit=crop&q=80'
+          : role === 'buyer'
+          ? 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80'
+          : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
     };
 
     users.push(newUser);
+    userCredentials[cleanEmail] = password;
 
     res.status(201).json({
       token: `farm_jwt_token_${newUser.id}_${Date.now()}`,
@@ -290,34 +324,42 @@ async function startServer() {
     const cropNamesList: string[] = [];
 
     const orderItems = items.map((it: any) => {
-      const subtotal = Number(it.unit_price || it.crop?.price || 0) * Number(it.quantity || 1);
+      const matchedCrop = crops.find(c => c.id === (it.crop_id || it.crop?.id));
+      const farmerId = it.farmer_id || matchedCrop?.farmer_id || it.crop?.farmer_id || 'user_farmer_1';
+      const farmerName = it.farmer_name || matchedCrop?.farmer_name || it.crop?.farmer_name || 'Ramesh Patel';
+      const farmerPhone = it.farmer_phone || matchedCrop?.farmer_phone || it.crop?.farmer_phone || '+91 98452 11029';
+      const unitPrice = Number(it.unit_price || it.price_per_unit || matchedCrop?.price || it.crop?.price || 0);
+      const qty = Number(it.quantity || 1);
+      const subtotal = Number(it.subtotal || it.total || unitPrice * qty);
       totalPrice += subtotal;
       
-      const weightFactor = it.unit === 'ton' ? 1000 : it.unit === 'quintal' ? 100 : 1;
-      totalWeightKg += Number(it.quantity || 1) * weightFactor;
+      const unit = it.unit || matchedCrop?.unit || it.crop?.unit || 'kg';
+      const weightFactor = unit === 'ton' ? 1000 : unit === 'quintal' ? 100 : 1;
+      totalWeightKg += qty * weightFactor;
 
-      const cName = it.crop_name || it.crop?.name || 'Crop';
-      cropNamesList.push(`${cName} (${it.quantity} ${it.unit || 'kg'})`);
+      const cName = it.crop_name || matchedCrop?.name || it.crop?.name || 'Crop';
+      cropNamesList.push(`${cName} (${qty} ${unit})`);
 
       // Decrease available inventory on crop
-      const matchedCrop = crops.find(c => c.id === (it.crop_id || it.crop?.id));
       if (matchedCrop) {
-        matchedCrop.quantity = Math.max(0, matchedCrop.quantity - Number(it.quantity || 1));
+        matchedCrop.quantity = Math.max(0, matchedCrop.quantity - qty);
       }
 
       return {
-        crop_id: it.crop_id || it.crop?.id || 'crop_1',
+        crop_id: it.crop_id || matchedCrop?.id || 'crop_1',
         crop_name: cName,
-        variety: it.variety || it.crop?.variety || '',
-        farmer_name: it.farmer_name || it.crop?.farmer_name || 'Farmer',
-        farmer_id: it.farmer_id || it.crop?.farmer_id || 'user_farmer_1',
-        farmer_phone: it.farmer_phone || it.crop?.farmer_phone || '+91 98452 11029',
-        unit_price: Number(it.unit_price || it.crop?.price || 0),
-        quantity: Number(it.quantity || 1),
-        unit: it.unit || it.crop?.unit || 'kg',
-        image: it.image || it.crop?.image || '',
+        variety: it.variety || matchedCrop?.variety || it.crop?.variety || '',
+        farmer_name: farmerName,
+        farmer_id: farmerId,
+        farmer_phone: farmerPhone,
+        unit_price: unitPrice,
+        price_per_unit: unitPrice,
+        quantity: qty,
+        unit: unit,
+        image: it.image || matchedCrop?.image || it.crop?.image || '',
         subtotal,
-        pickup_location: it.pickup_location || it.crop?.location || 'Farm gate'
+        total: subtotal,
+        pickup_location: it.pickup_location || matchedCrop?.location || 'Farm Gate'
       };
     });
 
@@ -331,6 +373,7 @@ async function startServer() {
       delivery_address: delivery_address || 'Agri Wholesale Hub, Bengaluru - 560022',
       items: orderItems,
       total_price: totalPrice,
+      total_amount: totalPrice + deliveryFee,
       delivery_fee: deliveryFee,
       status: 'PENDING',
       payment_method: payment_method || 'UPI',
@@ -345,21 +388,41 @@ async function startServer() {
     orders.unshift(newOrder);
 
     // Create corresponding transport dispatch request
-    const newTransport: TransportRequest = {
+    const firstItem = orderItems[0];
+    const newTransport: any = {
       id: transportId,
       order_id: orderId,
+      orderId: orderId,
+      crop: firstItem?.crop_name || 'Farm Produce',
+      crop_name: firstItem?.crop_name || 'Farm Produce',
       crop_names: cropNamesList.join(', '),
+      quantity: firstItem?.quantity || totalWeightKg,
       total_weight_kg: totalWeightKg,
-      pickup_location: orderItems[0]?.pickup_location || 'Nashik Mandi Yard, Maharashtra',
-      pickup_farmer_name: orderItems[0]?.farmer_name || 'Farmer',
-      pickup_contact: orderItems[0]?.farmer_phone || '+91 98452 11029',
+      cargo_weight_kg: totalWeightKg,
+      unit: firstItem?.unit || 'kg',
+      farmer: firstItem?.farmer_name || 'Farmer',
+      pickup_farmer_name: firstItem?.farmer_name || 'Farmer',
+      farmer_phone: firstItem?.farmer_phone || '+91 98452 11029',
+      pickup_contact: firstItem?.farmer_phone || '+91 98452 11029',
+      pickupLocation: firstItem?.pickup_location || 'Farm Gate Yard, Nashik',
+      pickup_location: firstItem?.pickup_location || 'Farm Gate Yard, Nashik',
       destination: newOrder.delivery_address,
+      delivery_location: newOrder.delivery_address,
       buyer_name: newOrder.buyer_name,
       buyer_contact: newOrder.buyer_phone,
-      distance_km: Math.floor(250 + Math.random() * 600),
+      distance: Math.floor(250 + Math.random() * 450),
+      distance_km: Math.floor(250 + Math.random() * 450),
+      pickupDate: new Date().toISOString().split('T')[0],
+      pickup_date: new Date().toISOString().split('T')[0],
+      estimatedEarnings: deliveryFee,
+      estimated_cost: deliveryFee,
       delivery_cost: deliveryFee,
-      status: 'AVAILABLE',
-      created_at: new Date().toISOString()
+      vehicle_type: totalWeightKg > 2500 ? '17ft Multi-Axle Heavy Truck' : '14ft Insulated Reefer Truck',
+      special_instructions: notes || 'Handle fresh farm produce with priority transit.',
+      handling_instructions: notes || 'Handle fresh farm produce with priority transit.',
+      status: 'PENDING_FARMER',
+      created_at: new Date().toISOString(),
+      createdAt: new Date().toISOString()
     };
 
     transports.unshift(newTransport);
@@ -377,9 +440,62 @@ async function startServer() {
     order.status = status;
     order.updated_at = new Date().toISOString();
 
-    // Sync corresponding transport status
-    if (order.transport_request_id) {
-      const tr = transports.find(t => t.id === order.transport_request_id);
+    // When Farmer confirms order, activate/create the Transport Request to AVAILABLE
+    if (status === 'CONFIRMED') {
+      let tr = transports.find(t => t.order_id === order.id || t.id === order.transport_request_id);
+      if (tr) {
+        tr.status = 'AVAILABLE';
+      } else {
+        const trId = order.transport_request_id || `TR-${Math.floor(1000 + Math.random() * 9000)}`;
+        const cropSummary = order.items.map((it: any) => `${it.crop_name || 'Produce'} (${it.quantity} ${it.unit || 'kg'})`).join(', ');
+        const first = order.items[0];
+        const totalWeight = order.items.reduce((s: number, it: any) => {
+          const factor = it.unit === 'ton' ? 1000 : it.unit === 'quintal' ? 100 : 1;
+          return s + (Number(it.quantity) || 1) * factor;
+        }, 0);
+        const delFee = order.delivery_fee || Math.round(Math.max(500, totalWeight * 2.2 + 800));
+
+        tr = {
+          id: trId,
+          order_id: order.id,
+          orderId: order.id,
+          crop: first?.crop_name || 'Farm Produce',
+          crop_name: first?.crop_name || 'Farm Produce',
+          crop_names: cropSummary,
+          quantity: first?.quantity || totalWeight,
+          total_weight_kg: totalWeight || 500,
+          cargo_weight_kg: totalWeight || 500,
+          unit: first?.unit || 'kg',
+          farmer: first?.farmer_name || 'Farmer',
+          pickup_farmer_name: first?.farmer_name || 'Farmer',
+          farmer_phone: first?.farmer_phone || '+91 98452 11029',
+          pickup_contact: first?.farmer_phone || '+91 98452 11029',
+          pickupLocation: first?.pickup_location || 'Farm Gate Yard, Maharashtra',
+          pickup_location: first?.pickup_location || 'Farm Gate Yard, Maharashtra',
+          destination: order.delivery_address,
+          delivery_location: order.delivery_address,
+          buyer_name: order.buyer_name,
+          buyer_contact: order.buyer_phone,
+          distance: Math.floor(250 + Math.random() * 450),
+          distance_km: Math.floor(250 + Math.random() * 450),
+          pickupDate: new Date().toISOString().split('T')[0],
+          pickup_date: new Date().toISOString().split('T')[0],
+          estimatedEarnings: delFee,
+          estimated_cost: delFee,
+          delivery_cost: delFee,
+          vehicle_type: totalWeight > 2500 ? '17ft Multi-Axle Heavy Truck' : '14ft Insulated Reefer Truck',
+          special_instructions: order.notes || 'Handle fresh farm produce with priority transit.',
+          handling_instructions: order.notes || 'Handle fresh farm produce with priority transit.',
+          status: 'AVAILABLE',
+          created_at: new Date().toISOString(),
+          createdAt: new Date().toISOString()
+        };
+        transports.unshift(tr);
+        order.transport_request_id = tr.id;
+      }
+    } else if (order.transport_request_id) {
+      // Sync corresponding transport status
+      const tr = transports.find(t => t.id === order.transport_request_id || t.order_id === order.id);
       if (tr) {
         if (status === 'PICKED_UP') tr.status = 'PICKED_UP';
         else if (status === 'IN_TRANSIT') tr.status = 'IN_TRANSIT';
@@ -396,16 +512,74 @@ async function startServer() {
   // ----------------------------------------------------
   app.get('/api/transport', (req, res) => {
     const { provider_id, status } = req.query;
+
+    // Ensure any confirmed order has an active transport request
+    orders.forEach(o => {
+      if (o.status === 'CONFIRMED' || o.status === 'PICKED_UP' || o.status === 'IN_TRANSIT') {
+        let existingTr = transports.find(t => t.order_id === o.id || t.id === o.transport_request_id);
+        if (!existingTr) {
+          const trId = o.transport_request_id || `TR-${Math.floor(1000 + Math.random() * 9000)}`;
+          const cropSummary = o.items.map((it: any) => `${it.crop_name || 'Produce'} (${it.quantity} ${it.unit || 'kg'})`).join(', ');
+          const first = o.items[0];
+          const totalWeight = o.items.reduce((s: number, it: any) => {
+            const factor = it.unit === 'ton' ? 1000 : it.unit === 'quintal' ? 100 : 1;
+            return s + (Number(it.quantity) || 1) * factor;
+          }, 0);
+          const delFee = o.delivery_fee || Math.round(Math.max(500, totalWeight * 2.2 + 800));
+
+          existingTr = {
+            id: trId,
+            order_id: o.id,
+            orderId: o.id,
+            crop: first?.crop_name || 'Farm Produce',
+            crop_name: first?.crop_name || 'Farm Produce',
+            crop_names: cropSummary,
+            quantity: first?.quantity || totalWeight,
+            total_weight_kg: totalWeight || 500,
+            cargo_weight_kg: totalWeight || 500,
+            unit: first?.unit || 'kg',
+            farmer: first?.farmer_name || 'Farmer',
+            pickup_farmer_name: first?.farmer_name || 'Farmer',
+            farmer_phone: first?.farmer_phone || '+91 98452 11029',
+            pickup_contact: first?.farmer_phone || '+91 98452 11029',
+            pickupLocation: first?.pickup_location || 'Farm Gate Yard, Maharashtra',
+            pickup_location: first?.pickup_location || 'Farm Gate Yard, Maharashtra',
+            destination: o.delivery_address,
+            delivery_location: o.delivery_address,
+            buyer_name: o.buyer_name,
+            buyer_contact: o.buyer_phone,
+            distance: Math.floor(250 + Math.random() * 450),
+            distance_km: Math.floor(250 + Math.random() * 450),
+            pickupDate: new Date().toISOString().split('T')[0],
+            pickup_date: new Date().toISOString().split('T')[0],
+            estimatedEarnings: delFee,
+            estimated_cost: delFee,
+            delivery_cost: delFee,
+            vehicle_type: totalWeight > 2500 ? '17ft Multi-Axle Heavy Truck' : '14ft Insulated Reefer Truck',
+            special_instructions: o.notes || 'Handle fresh farm produce with priority transit.',
+            handling_instructions: o.notes || 'Handle fresh farm produce with priority transit.',
+            status: o.status === 'CONFIRMED' ? 'AVAILABLE' : (o.status as any),
+            created_at: o.created_at || new Date().toISOString(),
+            createdAt: o.created_at || new Date().toISOString()
+          };
+          transports.unshift(existingTr);
+          o.transport_request_id = existingTr.id;
+        } else if (o.status === 'CONFIRMED' && existingTr.status === 'PENDING_FARMER') {
+          existingTr.status = 'AVAILABLE';
+        }
+      }
+    });
+
     let results = [...transports];
 
     if (provider_id) {
-      results = results.filter(t => t.transport_provider_id === provider_id);
+      results = results.filter(t => (t.transport_provider_id || t.provider_id || t.transporterId) === provider_id);
     }
     if (status) {
       results = results.filter(t => t.status === status);
     }
 
-    res.json(results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+    res.json(results.sort((a, b) => new Date(b.created_at || b.createdAt || '').getTime() - new Date(a.created_at || a.createdAt || '').getTime()));
   });
 
   app.post('/api/transport/:id/accept', (req, res) => {
@@ -415,17 +589,33 @@ async function startServer() {
       return res.status(404).json({ error: 'Transport request not found' });
     }
 
-    tr.transport_provider_id = provider_id || 'user_transport_1';
-    tr.transport_provider_name = provider_name || 'Gurpreet Singh (Kishan Express)';
-    tr.vehicle_number = vehicle_number || 'MH 12 QX 4821';
-    tr.driver_phone = driver_phone || '+91 98765 43210';
+    const pId = provider_id || 'user_transport_1';
+    const pName = provider_name || 'Gurpreet Singh (Kishan Express)';
+    const vNum = vehicle_number || 'MH 12 QX 4821';
+    const dPhone = driver_phone || '+91 98765 43210';
+
+    tr.transport_provider_id = pId;
+    tr.transporterId = pId;
+    tr.provider_id = pId;
+    tr.transport_provider_name = pName;
+    tr.transporterName = pName;
+    tr.provider_name = pName;
+    tr.vehicle_number = vNum;
+    tr.driver_phone = dPhone;
+    tr.driver_name = pName.split('(')[0].trim() || 'Gurpreet Singh';
     tr.status = 'ASSIGNED';
     tr.pickup_time = new Date(Date.now() + 2 * 3600 * 1000).toISOString();
+    tr.current_location = `Assigned to ${vNum} - En route to Farm Gate for pickup`;
 
-    // Update order status if it was confirmed
+    // Update order with transporter details
     const order = orders.find(o => o.id === tr.order_id);
-    if (order && order.status === 'PENDING') {
-      order.status = 'CONFIRMED';
+    if (order) {
+      if (order.status === 'PENDING') {
+        order.status = 'CONFIRMED';
+      }
+      (order as any).transporter_name = pName;
+      (order as any).vehicle_number = vNum;
+      order.updated_at = new Date().toISOString();
     }
 
     res.json(tr);
