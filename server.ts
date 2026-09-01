@@ -55,7 +55,27 @@ const userCredentials: Record<string, string> = {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const DEFAULT_PORT = Number(process.env.PORT || 4173);
+
+  const listenOnPort = (port: number): Promise<number> =>
+    new Promise((resolve, reject) => {
+      const server = app.listen(port, '0.0.0.0', () => {
+        const address = server.address();
+        const actualPort = typeof address === 'object' && address ? address.port : port;
+        console.log(`FarmLink server running at http://localhost:${actualPort}`);
+        resolve(actualPort);
+      });
+
+      server.on('error', (err: any) => {
+        if (err && err.code === 'EADDRINUSE' && port < DEFAULT_PORT + 10) {
+          console.warn(`Port ${port} is busy, trying ${port + 1}...`);
+          server.close(() => resolve(listenOnPort(port + 1)));
+          return;
+        }
+
+        reject(err);
+      });
+    });
 
   app.use(express.json());
 
@@ -950,9 +970,9 @@ Always format response with clear bullet points and helpful guidance.`;
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🌾 FarmLink Backend & UI server live on http://localhost:${PORT}`);
-  });
+  const PORT = await listenOnPort(DEFAULT_PORT);
+
+  console.log(`🌾 FarmLink Backend & UI server live on http://localhost:${PORT}`);
 }
 
 startServer().catch(err => {

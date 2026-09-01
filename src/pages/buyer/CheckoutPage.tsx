@@ -78,6 +78,7 @@ export const CheckoutPage: React.FC = () => {
 
       setOrderPlaced(res);
       clearCart();
+      window.open('payment.html', '_blank', 'noopener,noreferrer');
 
       // Trigger Confetti!
       try {
@@ -307,7 +308,6 @@ export const CheckoutPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Submit Button */}
               <div className="flex justify-end pt-2">
                 <button
                   type="submit"
